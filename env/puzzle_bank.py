@@ -80,7 +80,7 @@ def get_puzzle_spec(puzzle_id: int) -> PuzzleSpec:
     return PUZZLE_BANK[puzzle_id - 1]
 
 
-def make_config(puzzle_id: int = 6, max_steps: Optional[int] = None) -> PuzzleConfig:
+def make_config(puzzle_id: int = 22, max_steps: Optional[int] = None) -> PuzzleConfig:
     spec = get_puzzle_spec(puzzle_id)
     if max_steps is None:
         if spec.tier == "easy":

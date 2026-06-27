@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional
 
 from env.agent_env import PuzzleAgentEnv
 from env.puzzle import EightPuzzle
-from env.puzzle_bank import make_config
+from env.puzzle_bank import make_config, PUZZLE_COUNT
 from react.deepseek_prompts import DEEPSEEK_SYSTEM_PROMPT
 from react.prompts import build_user_message, extract_action
 from grading.scorer import grade_puzzle
@@ -161,7 +161,7 @@ def run_deepseek_react(
 def main() -> None:
     parser = argparse.ArgumentParser(description="DeepSeek ReAct 8-puzzle")
     parser.add_argument("--max-turns", type=int, default=60, help="最大 ReAct 轮数")
-    parser.add_argument("--puzzle", type=int, default=6, help="题目编号 1–21")
+    parser.add_argument("--puzzle", type=int, default=22, help=f"题目编号 1–{PUZZLE_COUNT}（默认 22 = Lab 正式题）")
     parser.add_argument("--model", default=DEEPSEEK_MODEL, help="DeepSeek 模型名")
     parser.add_argument("--max-steps", type=int, default=None, help="环境最大移动步数（默认随难度）")
     parser.add_argument("--run-dir", default="runs/deepseek", help="trace 输出目录")

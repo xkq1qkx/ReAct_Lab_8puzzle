@@ -101,8 +101,8 @@ def _add_puzzle_arg(p: argparse.ArgumentParser) -> None:
     p.add_argument(
         "--puzzle",
         type=int,
-        default=6,
-        help=f"题目编号 1–{PUZZLE_COUNT}（默认 6 = Lab 原题）",
+        default=22,
+        help=f"题目编号 1–{PUZZLE_COUNT}（默认 22 = Lab 正式题）",
     )
     p.add_argument(
         "--max-steps",
