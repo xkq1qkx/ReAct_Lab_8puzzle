@@ -23,7 +23,8 @@ from env.puzzle_bank import make_config
 from react.deepseek_prompts import DEEPSEEK_SYSTEM_PROMPT
 from react.prompts import build_user_message, extract_action
 from grading.scorer import grade_puzzle
-from react.runner import ReActTrace, save_trace
+from react.runner import ReActTrace, run_goal_inquiry, save_trace
+from react.trace_replay import board_to_json
 
 # ============ 在这里填入你的 API Key ============
 DEEPSEEK_API_KEY = ""
@@ -93,10 +94,17 @@ def run_deepseek_react(
     model: DeepSeekModel,
     max_turns: int = 60,
     verbose: bool = True,
+    goal_inquiry: bool = True,
 ) -> ReActTrace:
     trace = ReActTrace()
     result = env.reset()
     history: List[Dict[str, Any]] = []
+    trace.meta = {
+        "puzzle_id": env.puzzle.config.puzzle_id,
+        "start": board_to_json(env.puzzle.config.start),
+        "goal": board_to_json(env.puzzle.config.goal),
+        "max_steps": env.puzzle.config.max_steps,
+    }
 
     if verbose:
         print("=" * 60)
@@ -133,7 +141,18 @@ def run_deepseek_react(
         if result.done:
             break
 
-    trace.final_grade = grade_puzzle(env.puzzle)
+    goal_submission = None
+    if goal_inquiry and not env.puzzle.is_solved():
+        goal_submission, trace.goal_inquiry = run_goal_inquiry(
+            env.puzzle,
+            model,
+            env.mode,
+            verbose=verbose,
+            system_prompt=DEEPSEEK_SYSTEM_PROMPT,
+            history=history,
+        )
+
+    trace.final_grade = grade_puzzle(env.puzzle, goal_submission)
     if verbose:
         print(f"\n{'=' * 60}\n{trace.final_grade.feedback}")
     return trace
@@ -147,6 +166,11 @@ def main() -> None:
     parser.add_argument("--max-steps", type=int, default=None, help="环境最大移动步数（默认随难度）")
     parser.add_argument("--run-dir", default="runs/deepseek", help="trace 输出目录")
     parser.add_argument("--quiet", action="store_true", help="少打印中间过程")
+    parser.add_argument(
+        "--no-goal-inquiry",
+        action="store_true",
+        help="步数用尽后不进行目标位置追问",
+    )
     args = parser.parse_args()
 
     api_key = DEEPSEEK_API_KEY or os.getenv("DEEPSEEK_API_KEY", "")
@@ -160,7 +184,11 @@ def main() -> None:
     )
 
     trace = run_deepseek_react(
-        env, model, max_turns=args.max_turns, verbose=not args.quiet
+        env,
+        model,
+        max_turns=args.max_turns,
+        verbose=not args.quiet,
+        goal_inquiry=not args.no_goal_inquiry,
     )
 
     out = Path(args.run_dir) / "trace.json"

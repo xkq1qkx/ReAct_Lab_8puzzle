@@ -3,6 +3,7 @@
 from env.agent_env import PuzzleAgentEnv
 from env.puzzle import EightPuzzle
 from env.puzzle_bank import PUZZLE_COUNT, get_puzzle_spec, make_config
+from grading.goal_inquiry import goals_match, parse_goal_submission, parse_yes_no
 from grading.scorer import grade_puzzle
 
 
@@ -74,3 +75,79 @@ def test_grade_unsolved():
     g = grade_puzzle(EightPuzzle())
     assert g.total_score == 0.0
     assert not g.solved
+
+
+def test_parse_goal_submission():
+    text = "\n".join(
+        f"{n} @ ({r}, {c})"
+        for n, (r, c) in [
+            (1, (0, 0)),
+            (2, (0, 1)),
+            (3, (0, 2)),
+            (4, (1, 0)),
+            (5, (1, 1)),
+            (6, (1, 2)),
+            (7, (2, 0)),
+            (8, (2, 1)),
+        ]
+    )
+    goals = parse_goal_submission(text)
+    assert goals is not None
+    puzzle = EightPuzzle()
+    assert goals_match(puzzle, goals)
+
+
+def test_grade_half_score_for_correct_goals():
+    puzzle = EightPuzzle()
+    submission = puzzle.goal_positions()
+    g = grade_puzzle(puzzle, submission)
+    assert g.total_score == 0.5
+    assert g.goals_known
+    assert not g.solved
+
+
+def test_grade_wrong_goals():
+    puzzle = EightPuzzle()
+    g = grade_puzzle(puzzle, {1: (2, 2), 2: (0, 1), 3: (0, 2), 4: (1, 0), 5: (1, 1), 6: (1, 2), 7: (2, 0), 8: (2, 1)})
+    assert g.total_score == 0.0
+    assert not g.goals_known
+
+
+def test_parse_goal_submission_compact_format():
+    text = "\n".join(
+        f"{n}@({r},{c})"
+        for n, (r, c) in [
+            (1, (0, 2)),
+            (2, (0, 1)),
+            (3, (0, 0)),
+            (4, (1, 1)),
+            (5, (1, 2)),
+            (6, (1, 0)),
+            (7, (2, 1)),
+            (8, (2, 0)),
+        ]
+    )
+    goals = parse_goal_submission(text)
+    assert goals is not None
+    from env.puzzle_bank import make_config
+
+    puzzle = EightPuzzle(make_config(puzzle_id=22))
+    assert goals_match(puzzle, goals)
+
+
+def test_parse_yes_no():
+    assert parse_yes_no("YES") is True
+    assert parse_yes_no("Thought...\nNO") is False
+    assert parse_yes_no("是") is True
+
+
+def test_trace_replay_from_existing_trace():
+    from pathlib import Path
+
+    from react.trace_replay import frames_from_trace, load_trace
+
+    data = load_trace(Path("runs/deepseek/trace.json"))
+    meta, frames = frames_from_trace(data)
+    assert frames[0].puzzle_step == 0
+    assert len(frames) >= data["grade"]["steps"]
+    assert frames[-1].puzzle_step == data["grade"]["steps"]

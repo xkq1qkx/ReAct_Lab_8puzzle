@@ -10,6 +10,7 @@ from pathlib import Path
 from env.agent_env import PuzzleAgentEnv
 from env.puzzle import EightPuzzle
 from env.puzzle_bank import PUZZLE_COUNT, list_puzzles_text, make_config
+from grading.goal_inquiry import collect_goals_batch_interactive
 from grading.scorer import grade_puzzle
 from react.runner import MockModel, OpenAICompatibleModel, run_react_episode, save_trace
 
@@ -30,23 +31,35 @@ def cmd_play(args: argparse.Namespace) -> None:
     if result.image_path:
         print(f"[图像已保存] {result.image_path}")
 
+    ended_by_quit = False
     while not result.done:
         action = input("\nAction> ").strip()
         if action.lower() in {"quit", "q", "exit"}:
+            ended_by_quit = True
             break
         result = env.step(action)
         print(f"\n--- 环境更新 ---\n{result.observation}")
         if args.mode == "vlm" and result.image_path:
             print(f"[图像] {result.image_path}")
 
+    goal_submission = None
+    if not ended_by_quit and not env.puzzle.is_solved():
+        goal_submission = collect_goals_batch_interactive(env.puzzle)
+
     print("\n游戏结束。")
-    print(grade_puzzle(env.puzzle).feedback)
+    print(grade_puzzle(env.puzzle, goal_submission).feedback)
 
 
 def cmd_run(args: argparse.Namespace) -> None:
     env = _load_env(args.mode, args.run_dir, args.puzzle, args.max_steps)
     model = MockModel() if args.backend == "mock" else OpenAICompatibleModel(model=args.model)
-    trace = run_react_episode(env, model, max_turns=args.max_turns, verbose=not args.quiet)
+    trace = run_react_episode(
+        env,
+        model,
+        max_turns=args.max_turns,
+        verbose=not args.quiet,
+        goal_inquiry=not args.no_goal_inquiry,
+    )
     out = Path(args.run_dir) / "trace.json"
     save_trace(trace, out)
     print(f"\nTrace saved to {out}")
@@ -59,6 +72,18 @@ def cmd_list(_: argparse.Namespace) -> None:
 def cmd_grade(args: argparse.Namespace) -> None:
     data = json.loads(Path(args.trace).read_text(encoding="utf-8"))
     print(json.dumps(data.get("grade"), ensure_ascii=False, indent=2))
+
+
+def cmd_video(args: argparse.Namespace) -> None:
+    from react.trace_video import render_trace_video
+
+    out = render_trace_video(
+        Path(args.trace),
+        output_path=Path(args.output) if args.output else None,
+        fps=args.fps,
+        width=args.width,
+    )
+    print(f"视频已保存: {out}")
 
 
 def cmd_render(args: argparse.Namespace) -> None:
@@ -107,12 +132,24 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--max-turns", type=int, default=40)
     run.add_argument("--run-dir", default="runs/react")
     run.add_argument("--quiet", action="store_true")
+    run.add_argument(
+        "--no-goal-inquiry",
+        action="store_true",
+        help="步数用尽后不进行目标位置追问",
+    )
     _add_puzzle_arg(run)
     run.set_defaults(func=cmd_run)
 
     grade = sub.add_parser("grade", help="查看 trace 得分")
     grade.add_argument("trace", help="trace.json 路径")
     grade.set_defaults(func=cmd_grade)
+
+    video = sub.add_parser("video", help="将 trace 渲染为 MP4 回放视频")
+    video.add_argument("trace", help="trace.json 路径")
+    video.add_argument("--output", "-o", help="输出 mp4 路径（默认同目录 trace.mp4）")
+    video.add_argument("--fps", type=float, default=2.0, help="视频帧率")
+    video.add_argument("--width", type=int, default=480, help="视频宽度（像素）")
+    video.set_defaults(func=cmd_video)
 
     render = sub.add_parser("render", help="渲染示例盘面图像")
     render.add_argument("--output", default="assets/sample_board.png")

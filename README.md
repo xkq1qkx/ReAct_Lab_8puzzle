@@ -13,7 +13,7 @@
 | 反馈   | 每次移动后环境**自动更新**：数字已在目标格 → **绿色**；否则 → **蓝色** |
 | 推理   | 通过不断尝试，从绿/蓝反馈中**收集**目标位置信息                   |
 | 动作   | 每步从 2–4 个合法**滑动选项**中选一个（A/B/C…）              |
-| 得分   | **1.0 分**：将所有数字块移动到目标位置；否则 0 分               |
+| 得分   | **1.0 分**：完成拼图；**0.5 分**：未完成但步数用尽后正确提交全部 8 个目标位置；否则 0 分 |
 
 
 ## 两种模式
@@ -51,10 +51,18 @@ Action: B
 
 ## 得分
 
-仅看最终是否完成拼图：
+- **1.0**：将所有数字块移动到各自目标位置
+- **0.5**：步数用尽后未能完成，但依次正确提交全部 8 个数字块的目标坐标
+- **0.0**：其余情况
 
 ```bash
 python run_lab.py grade runs/react/trace.json
+
+# 将 trace 渲染为回放视频
+conda activate promptEvn
+conda install -c conda-forge ffmpeg   # 推荐：在 conda 环境里装 ffmpeg
+pip install -r requirements.txt     # 含 imageio，用于写 mp4
+python run_lab.py video runs/deepseek/trace.json -o runs/deepseek/replay.mp4
 ```
 
 ## 目录结构
